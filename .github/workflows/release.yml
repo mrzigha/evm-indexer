@@ -49,20 +49,60 @@ jobs:
           asset_name: evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz
           asset_content_type: application/gzip
 
+  docker:
+      name: Build and Push Docker Image
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+        packages: write
+      steps:
+        - uses: actions/checkout@v3
+
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
+
+        - name: Log in to the Container registry
+          uses: docker/login-action@v3
+          with:
+            registry: ${{ env.REGISTRY }}
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Extract metadata (tags, labels) for Docker
+          id: meta
+          uses: docker/metadata-action@v5
+          with:
+            images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            tags: |
+              type=semver,pattern={{version}}
+              type=semver,pattern={{major}}.{{minor}}
+              type=sha
+
+        - name: Build and push Docker image
+          uses: docker/build-push-action@v5
+          with:
+            context: .
+            push: true
+            tags: ${{ steps.meta.outputs.tags }}
+            labels: ${{ steps.meta.outputs.labels }}
+            cache-from: type=gha
+            cache-to: type=gha,mode=max
+
   notify:
-    needs: build-and-release
+    needs: [build-and-release, docker]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Notify Success
-        if: ${{ needs.build-and-release.result == 'success' }}
+        if: ${{ needs.build-and-release.result == 'success' && needs.docker.result == 'success' }}
         run: |
           echo "::notice::Release v${{ github.event.release.tag_name }} built and uploaded successfully"
           echo "::notice::Asset: evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz"
+          echo "::notice::Docker Image: ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}"
           echo "::notice::Download URL: ${{ github.event.release.html_url }}"
 
       - name: Notify Failure
-        if: ${{ needs.build-and-release.result == 'failure' }}
+        if: ${{ needs.build-and-release.result == 'failure' || needs.docker.result == 'failure' }}
         run: |
           echo "::error::Release v${{ github.event.release.tag_name }} failed"
           echo "::error::Please check the build logs for details"
