@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          override: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Build Release
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Prepare Release Package
+        run: |
+          mkdir -p release/evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu
+          cp target/x86_64-unknown-linux-gnu/release/evm-indexer release/evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu/
+          cp README.md LICENSE.md release/evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu/
+          cp -r examples release/evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu/
+          cp -r docs release/evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu/
+          cd release
+          tar -czf evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./release/evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz
+          asset_name: evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz
+          asset_content_type: application/gzip
+
+  notify:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify Success
+        if: ${{ needs.build-and-release.result == 'success' }}
+        run: echo "::notice::Release build and upload completed successfully"
+      
+      - name: Notify Failure
+        if: ${{ needs.build-and-release.result == 'failure' }}
+        run: echo "::error::Release build or upload failed"
