@@ -1,0 +1,51 @@
+[general]
+metrics_laddr = "0.0.0.0" # The address to bind the metrics server to
+metrics_port = 9090 # The port to bind the metrics server to
+
+[database]
+db_host = "mongodb" # The host of the MongoDB instance
+db_port = 27017 # The port of the MongoDB instance
+db_name = "evm_indexer" # The name of the database to use
+
+############################################################################################
+# WARNING: ALWAYS SET TWO OR MORE RPC ENDPOINTS FOR EACH CHAIN (ONE WS(S) AND ONE HTTP(S)) #
+#          Historical indexing mode requires at least one HTTP(S) endpoint                 #
+############################################################################################
+
+[[chains]]
+name = "Ethereum Mainnet" # The name of the chain
+contract_address = "0xABC..." # The address of the contract to index
+starting_block = 21159441 # The block to start indexing from (in historical mode)
+
+[[chains.rpcs]]
+url = "wss://mainnet.infura.io/ws/v3/..." # The URL of the RPC endpoint
+rpc_type = "ws" # The type of the RPC endpoint (ws or http)
+priority = 1 # The priority of the RPC endpoint
+health_check = { interval_secs = 30, timeout_secs = 5, min_peers = 2, max_blocks_behind = 50 } # The health check configuration
+circuit_breaker = { failure_threshold = 5, reset_timeout = 300, half_open_timeout = 60 } # The circuit breaker configuration
+
+[[chains.rpcs]]
+url = "https://mainnet.infura.io/v3/..." # The URL of the RPC endpoint
+rpc_type = "http" # The type of the RPC endpoint (ws or http)
+priority = 2 # The priority of the RPC endpoint
+health_check = { interval_secs = 30, timeout_secs = 5, min_peers = 2, max_blocks_behind = 50 } # The health check configuration
+circuit_breaker = { failure_threshold = 5, reset_timeout = 300, half_open_timeout = 60 } # The circuit breaker configuration
+
+[[chains]]
+name = "Binance Smart Chain" # The name of the chain
+contract_address = "0xDEF..." # The address of the contract to index
+starting_block = 0 # The block to start indexing from (in historical mode)
+
+[[chains.rpcs]]
+url = "wss://bsc-dataseed1.defibit.io" # The URL of the RPC endpoint
+rpc_type = "ws" # The type of the RPC endpoint (ws or http)
+priority = 1 # The priority of the RPC endpoint
+health_check = { interval_secs = 30, timeout_secs = 5, min_peers = 2, max_blocks_behind = 50 } # The health check configuration
+circuit_breaker = { failure_threshold = 5, reset_timeout = 300, half_open_timeout = 60 } # The circuit breaker configuration
+
+[[chains.rpcs]]
+url = "https://bsc-dataseed1.defibit.io" # The URL of the RPC endpoint
+rpc_type = "http" # The type of the RPC endpoint (ws or http)
+priority = 2 # The priority of the RPC endpoint
+health_check = { interval_secs = 30, timeout_secs = 5, min_peers = 2, max_blocks_behind = 50 } # The health check configuration
+circuit_breaker = { failure_threshold = 5, reset_timeout = 300, half_open_timeout = 60 } # The circuit breaker configuration

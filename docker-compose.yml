@@ -1,0 +1,25 @@
+services:
+  evm-indexer:
+    image: evm-indexer:[TAG]
+    container_name: evm-indexer
+    env_file:
+      - .env
+    ports:
+      - "9090:9090"
+    networks:
+      - indexer-network
+    volumes:
+      - [YOUR LOGS FOLDER]:/app/logs
+      - [YOUR CONFIG FILE]:/app/config/config.toml
+      - [YOUR ABI FILE]:/app/config/abi.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  indexer-network:
+    driver: bridge

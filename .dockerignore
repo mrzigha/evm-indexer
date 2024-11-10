@@ -1,0 +1,10 @@
+config/
+target/
+.git/
+.gitignore
+.env
+logs/
+Dockerfile.dev
+docker-compose.dev.yml
+prometheus.yml
+Cargo.lock
