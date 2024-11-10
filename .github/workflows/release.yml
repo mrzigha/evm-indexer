@@ -55,8 +55,12 @@ jobs:
     steps:
       - name: Notify Success
         if: ${{ needs.build-and-release.result == 'success' }}
-        run: echo "::notice::Release build and upload completed successfully"
-      
+        run: |
+          echo "::notice::Release v${{ github.event.release.tag_name }} built and uploaded successfully"
+          echo "::notice::Asset: evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz"
+
       - name: Notify Failure
         if: ${{ needs.build-and-release.result == 'failure' }}
-        run: echo "::error::Release build or upload failed"
+        run: |
+          echo "::error::Release v${{ github.event.release.tag_name }} failed"
+          echo "::error::Please check the build logs for details"
