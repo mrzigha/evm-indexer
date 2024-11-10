@@ -80,9 +80,22 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
+          platforms: linux/amd64,linux/arm64
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
