@@ -37,6 +37,7 @@ jobs:
           cp -r docs release/evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu/
           cd release
           tar -czf evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu
+          sha256sum evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz > evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz.sha256
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -58,6 +59,7 @@ jobs:
         run: |
           echo "::notice::Release v${{ github.event.release.tag_name }} built and uploaded successfully"
           echo "::notice::Asset: evm-indexer-v${{ github.event.release.tag_name }}-x86_64-unknown-linux-gnu.tar.gz"
+          echo "::notice::Download URL: ${{ github.event.release.html_url }}"
 
       - name: Notify Failure
         if: ${{ needs.build-and-release.result == 'failure' }}
