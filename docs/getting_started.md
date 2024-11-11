@@ -4,7 +4,7 @@ Welcome to EVM-Indexer! This guide will help you get started with installing and
 
 ## Installation Options
 
-**WARNNING**: At the moment, the indexer is only tested on Linux x86_64. Other platforms may not work as expected.
+**WARNING**: At the moment, the indexer is only tested on Linux x86_64. Other platforms may not work as expected.
 
 To begin, you will need to clone the repository:
 
