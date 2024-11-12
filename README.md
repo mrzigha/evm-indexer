@@ -5,6 +5,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.82+-orange.svg)
 ![Status](https://img.shields.io/badge/status-production_ready-green.svg)
+[![Release](https://github.com/mrzigha/evm-indexer/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/mrzigha/evm-indexer/actions/workflows/release.yml)
 
 A high-performance, fault-tolerant Web3 event indexer written in Rust. This tool efficiently indexes smart contract events across multiple EVM-compatible blockchains and stores them in MongoDB.
 
