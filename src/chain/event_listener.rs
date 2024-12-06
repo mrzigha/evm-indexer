@@ -163,6 +163,7 @@ impl EventListener {
                         tracing::info!("Waiting {:?} before retry", duration);
                         tokio::time::sleep(duration).await;
                     }
+                    connection.ensure_connection().await?;
                 }
             }
         }
