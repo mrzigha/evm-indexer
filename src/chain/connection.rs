@@ -105,7 +105,7 @@ impl ChainConnection {
                         if current_block > last_block {
                             let filter = FilterBuilder::default()
                                 .address(vec![contract])
-                                .from_block(BlockNumber::Number(last_block))
+                                .from_block(BlockNumber::Number(last_block + 1))
                                 .to_block(BlockNumber::Number(current_block))
                                 .build();
                             
