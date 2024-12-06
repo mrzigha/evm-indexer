@@ -1,23 +1,47 @@
-use crate::error::Result;
-use crate::config::{ChainConfig, RpcEndpoint};
+use crate::config::{ChainConfig, RpcEndpoint, RpcType};
 use crate::metrics::MetricsCollector;
 use crate::circuit_breaker::CircuitBreaker;
-use web3::transports::WebSocket;
+use crate::chain::ChainState;
+use crate::error::{Error, Result};
+use web3::transports::{WebSocket, Http};
 use web3::Web3;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::chain::ChainState;
-use web3::types::{H160, Log};
+use web3::types::{Log, BlockNumber, FilterBuilder, H160};
+use std::time::Duration;
 use std::str::FromStr;
-use web3::api::SubscriptionStream;
-use crate::error::Error;
+use futures::Stream;
+
+type EventStream = dyn Stream<Item = web3::Result<Log>> + Send + 'static;
+
+#[derive(Clone)]
+pub enum Transport {
+    WebSocket(Web3<WebSocket>),
+    Http(Web3<Http>),
+}
+
+impl Transport {
+    pub async fn new(endpoint: &RpcEndpoint) -> Result<Self> {
+        match endpoint.rpc_type {
+            RpcType::WebSocket => {
+                let transport = WebSocket::new(&endpoint.url).await.map_err(Error::Web3Error)?;
+                Ok(Transport::WebSocket(Web3::new(transport)))
+            },
+            RpcType::Http => {
+                let transport = Http::new(&endpoint.url).map_err(Error::Web3Error)?;
+                Ok(Transport::Http(Web3::new(transport)))
+            },
+        }
+    }
+}
 
 pub struct ChainConnection {
-    web3: Option<Web3<WebSocket>>,
+    transport: Option<Transport>,
     pub config: ChainConfig,
     current_endpoint: Arc<RwLock<Option<RpcEndpoint>>>,
     pub state: Arc<ChainState>,
     pub circuit_breaker: CircuitBreaker,
+    polling_interval: Duration,
 }
 
 impl ChainConnection {
@@ -33,20 +57,80 @@ impl ChainConnection {
         );
 
         let mut connection = Self {
-            web3: None,
+            transport: None,
             config,
             current_endpoint: Arc::new(RwLock::new(None)),
             state,
             circuit_breaker,
+            polling_interval: Duration::from_secs(2),
         };
 
         connection.connect().await?;
         Ok(connection)
     }
 
-    async fn connect(&mut self) -> Result<()> {
+    pub async fn subscribe_to_events(&mut self) -> Result<Box<EventStream>> {
+        self.ensure_connection().await?;
+        
+        let transport = self.transport.as_ref().ok_or(Error::NotConnected)?;
+        let contract = H160::from_str(&self.config.contract_address)
+            .map_err(|_| Error::InvalidAddress)?;
+        
+        Ok(match transport {
+            Transport::WebSocket(web3) => {
+                let current_block = web3.eth().block_number().await?;
+                let filter = FilterBuilder::default()
+                    .address(vec![contract])
+                    .from_block(BlockNumber::Number(current_block))
+                    .build();
+                
+                let stream = web3.eth_subscribe().subscribe_logs(filter).await?;
+                Box::new(stream)
+            },
+            Transport::Http(web3) => {
+                let _filter = FilterBuilder::default()
+                    .address(vec![contract])
+                    .build();
+
+                let web3 = web3.clone();
+                let interval = self.polling_interval;
+                
+                let stream = async_stream::stream! {
+                    let mut last_block = web3.eth().block_number().await?;
+                    
+                    loop {
+                        tokio::time::sleep(interval).await;
+                        
+                        let current_block = web3.eth().block_number().await?;
+                        if current_block > last_block {
+                            let filter = FilterBuilder::default()
+                                .address(vec![contract])
+                                .from_block(BlockNumber::Number(last_block + 1))
+                                .to_block(BlockNumber::Number(current_block))
+                                .build();
+                            
+                            match web3.eth().logs(filter).await {
+                                Ok(logs) => {
+                                    for log in logs {
+                                        yield Ok(log);
+                                    }
+                                }
+                                Err(e) => yield Err(e),
+                            }
+                            
+                            last_block = current_block;
+                        }
+                    }
+                };
+                
+                Box::new(stream)
+            }
+        })
+    }
+
+    pub async fn connect(&mut self) -> Result<()> {
         let max_retries = 3;
-        let retry_delay = std::time::Duration::from_secs(5);
+        let retry_delay = Duration::from_secs(5);
     
         for endpoint in &self.config.rpcs {
             let mut attempts = 0;
@@ -54,9 +138,9 @@ impl ChainConnection {
             while attempts < max_retries {
                 tracing::info!("Attempting to connect to {}", endpoint.url);
                 
-                match WebSocket::new(&endpoint.url).await {
+                match Transport::new(endpoint).await {
                     Ok(transport) => {
-                        self.web3 = Some(Web3::new(transport));
+                        self.transport = Some(transport);
                         *self.current_endpoint.write().await = Some(endpoint.clone());
                         self.state.metrics.set_connection_status(true);
                         tracing::info!("Successfully connected to {}", endpoint.url);
@@ -82,83 +166,30 @@ impl ChainConnection {
         }
         
         tracing::error!("Failed to connect to any RPC endpoint after all retries");
-        Err(crate::error::Error::NoHealthyEndpoints)
+        Err(Error::NoHealthyEndpoints)
     }
 
     pub async fn ensure_connection(&mut self) -> Result<()> {
-        if self.web3.is_none() {
+        if self.transport.is_none() {
             self.connect().await?;
         }
 
-        if let Some(web3) = &self.web3 {
-            match web3.eth().block_number().await {
-                Ok(_) => Ok(()),
-                Err(_) => {
-                    tracing::warn!("Connection check failed, attempting reconnect");
-                    self.reconnect().await
-                }
-            }
-        } else {
-            self.connect().await
-        }
-    }
+        match &self.transport {
+            Some(transport) => {
+                let block_check = match transport {
+                    Transport::WebSocket(web3) => web3.eth().block_number().await,
+                    Transport::Http(web3) => web3.eth().block_number().await,
+                };
 
-    pub async fn reconnect(&mut self) -> Result<()> {
-        self.web3 = None;
-        self.state.metrics.set_connection_status(false);
-        self.connect().await
-    }
-
-    pub async fn subscribe_to_events(&mut self) -> Result<SubscriptionStream<WebSocket, Log>> {
-        const SUBSCRIPTION_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
-        const MAX_SUBSCRIPTION_ATTEMPTS: u32 = 3;
-    
-        let mut attempts = 0;
-        while attempts < MAX_SUBSCRIPTION_ATTEMPTS {
-            self.ensure_connection().await?;
-            
-            let web3 = self.web3.as_ref().ok_or(Error::NotConnected)?;
-            let contract = H160::from_str(&self.config.contract_address)
-                .map_err(|_| Error::InvalidAddress)?;
-            
-            let current_block = web3.eth().block_number().await?;
-            
-            let filter = web3::types::FilterBuilder::default()
-                .address(vec![contract])
-                .from_block(web3::types::BlockNumber::Number(current_block))
-                .build();
-                
-            match web3.eth_subscribe()
-                .subscribe_logs(filter)
-                .await 
-            {
-                Ok(subscription) => {
-                    tracing::info!(
-                        "Successfully subscribed to events for contract {} from block {} (live monitoring)",
-                        self.config.contract_address,
-                        current_block
-                    );
-                    return Ok(subscription);
-                },
-                Err(e) => {
-                    attempts += 1;
-                    tracing::warn!(
-                        "Failed to subscribe to events (attempt {}/{}): {:?}",
-                        attempts,
-                        MAX_SUBSCRIPTION_ATTEMPTS,
-                        e
-                    );
-                    
-                    if attempts < MAX_SUBSCRIPTION_ATTEMPTS {
-                        tokio::time::sleep(SUBSCRIPTION_RETRY_DELAY).await;
-                        self.reconnect().await?;
-                    } else {
-                        return Err(Error::Web3Error(e));
+                match block_check {
+                    Ok(_) => Ok(()),
+                    Err(_) => {
+                        tracing::warn!("Connection check failed, attempting reconnect");
+                        self.connect().await
                     }
                 }
             }
+            None => self.connect().await,
         }
-        
-        Err(Error::NoHealthyEndpoints)
     }
 }

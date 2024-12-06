@@ -28,6 +28,23 @@ If you encounter issues with EVM-Indexer, follow these steps to diagnose and res
 - Check network connectivity
 - Verify WebSocket/HTTP endpoints are correct
 - Check RPC rate limits
+- For HTTP endpoints, verify if polling interval is appropriate
+- For WebSocket endpoints, check for connection stability
+- Monitor event latency differences between HTTP and WebSocket
+
+### Transport-Specific Issues
+
+#### WebSocket Issues
+- Check if WebSocket port is accessible
+- Verify WebSocket protocol (wss:// vs ws://)
+- Check for connection timeouts
+- Monitor reconnection attempts
+
+#### HTTP Issues
+- Verify endpoint supports necessary eth_ methods
+- Check rate limiting on HTTP endpoints
+- Monitor polling interval effectiveness
+- Verify response times are within acceptable range
 
 ### MongoDB Issues
 - Verify MongoDB connection string

@@ -29,10 +29,11 @@ A high-performance, fault-tolerant Web3 event indexer written in Rust. This tool
   - Reconnection handling with exponential backoff
   - Error recovery mechanisms
 
-- **⚡ Dual Sync Mode**
-  - Real-time event monitoring via WebSocket
+- **⚡ Flexible Sync Modes**
+  - Real-time event monitoring via WebSocket or HTTP(S)
   - Historical synchronization via HTTP(S)
-  - Parallel processing of both modes
+  - Parallel processing capabilities
+  - Intelligent polling for HTTP endpoints
 
 - **📊 Efficient Data Management**
   - MongoDB integration for reliable storage
@@ -59,6 +60,7 @@ A high-performance, fault-tolerant Web3 event indexer written in Rust. This tool
 - 📊 Efficient resource utilization
 - 🛡️ Comprehensive error handling
 - 🎯 Clean shutdown mechanisms
+- 🔄 Support for both WebSocket and HTTP(S) monitoring
 
 ## 🛠️ Built With
 
@@ -67,6 +69,7 @@ A high-performance, fault-tolerant Web3 event indexer written in Rust. This tool
 - [MongoDB](https://www.mongodb.com/) - Event storage
 - [Prometheus](https://prometheus.io/) - Metrics and monitoring
 - [Docker](https://www.docker.com/) - Containerization
+
 
 ## 📊 Project Status
 

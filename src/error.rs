@@ -64,6 +64,9 @@ pub enum Error {
 
     #[error("Log error: {0}")]
     LogError(String),
+
+    #[error("Invalid RPC type specified")]
+    InvalidRpcType,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
