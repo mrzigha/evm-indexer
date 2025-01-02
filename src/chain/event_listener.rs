@@ -116,6 +116,8 @@ impl EventListener {
             ..ExponentialBackoff::default()
         };
 
+        let mut last_block = 0u64;
+
         loop {
             let mut connection = self.connection.write().await;
             match connection.subscribe_to_events().await {
@@ -124,7 +126,7 @@ impl EventListener {
                     backoff.reset();
                     
                     let mut pinned_stream = Pin::from(event_stream);
-                    tracing::info!("Starting to process events...");
+                    tracing::info!("Starting to process events for chain {}", self.connection.read().await.config.name);
                     
                     while let Some(result) = pinned_stream.next().await {
                         let connection = self.connection.read().await;
@@ -133,9 +135,17 @@ impl EventListener {
                         match result.map_err(Error::Web3Error) {
                             Ok(log) => {
                                 if let Some(block_number) = log.block_number {
-                                    connection.state.metrics.update_block_height(block_number.as_u64());
+                                    let current_block = block_number.as_u64();
+                                    if current_block > last_block {
+                                        tracing::info!(
+                                            "Processing block #{} for chain {}",
+                                            current_block,
+                                            connection.config.name
+                                        );
+                                        last_block = current_block;
+                                    }
+                                    connection.state.metrics.update_block_height(current_block);
                                 }
-
                                 match self.process_event(log).await {
                                     Ok(event_name) => {
                                         connection.state.metrics.record_event_by_type(&event_name);
