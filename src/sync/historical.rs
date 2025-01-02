@@ -48,9 +48,10 @@ impl<T: Transport> HistoricalSync<T> {
             let end_block = std::cmp::min(current_block + self.batch_size, to_block);
             
             tracing::info!(
-                "Processing historical blocks {} to {}",
+                "Processing historical blocks {} to {} for chain {}",
                 current_block,
-                end_block
+                end_block,
+                self.chain_name
             );
 
             let logs = self.fetch_logs_batch(current_block, end_block).await?;
