@@ -1,6 +1,7 @@
 use evm_indexer::{
     chain::{connection::ChainConnection, event_listener::EventListener}, config::{Config, RpcType}, db::DatabaseConnection, decoder::{abi::EventDecoder, DecoderConfig}, health::HealthCheck, metrics::MetricsCollector, sync::historical::HistoricalSync, Error};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 use std::{env, fs, path::Path, sync::Arc};
 use warp::Filter;
@@ -26,11 +27,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let (stdout_non_blocking, _stdout_guard) = tracing_appender::non_blocking(std::io::stdout());
 
     tracing_subscriber::fmt()
     .with_env_filter("info,evm_indexer=debug")
     .json()
-    .with_writer(non_blocking)
+    .with_writer(non_blocking.and(stdout_non_blocking))
     .init();
 
     let config = Config::new()?;
